@@ -1,0 +1,12 @@
+---
+
+# https://github.com/ansible/molecule/blob/master/molecule/cookiecutter/molecule/%7B%7Bcookiecutter.role_name%7D%7D/.yamllint
+extends: default
+rules:
+  line-length:
+    max: 80
+    level: warning
+  truthy:
+    allowed-values:
+      - "yes"
+      - "no"

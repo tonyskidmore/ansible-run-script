@@ -1,0 +1,104 @@
+---
+
+- name: Debug distribution details
+  debug:
+    msg: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+- name: Install required packages
+  package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ script_packages }}"
+  become: yes
+
+- name: Clone the repo
+  git:
+    repo: "{{ script_url }}/{{ script_project }}/{{ script_name }}.git"
+    version: "{{ script_ref }}"
+    dest: "{{ script_tmp_dir }}"
+
+- name: Install script
+  command: "{{ script_install }}"
+  args:
+    chdir: "{{ script_tmp_dir }}"
+    creates: "{{ script_path }}"
+  when: script_requires_install | bool
+  register: script_install_result
+  become: yes
+
+- name: Debug script_install_result
+  debug:
+    var: script_install_result
+    verbosity: "{{ verbosity_level }}"
+
+- name: Execute script
+  command: "{{ script_path }} {{ script_params }}"
+  changed_when: script_makes_change | bool
+  when: script_execute | bool
+  become: yes
+
+- name: Fetch report output
+  block:
+
+    - name: Create local report output path
+      file:
+        path: "{{ script_fetch_path }}"
+        state: directory
+      delegate_to: localhost
+      run_once: yes
+
+    - name: Debug script_output_dir
+      debug:
+        var: script_output_dir
+        verbosity: "{{ verbosity_level }}"
+
+    - name: Find report output directories
+      find:
+        paths: "{{ script_output_dir }}/"
+        file_type: directory
+        recurse: no
+        patterns: "^report\\.[0-9]{10}$"
+        use_regex: yes
+      register: script_find_report_dirs
+      become: yes
+
+    - name: Debug script_find_report_dirs
+      debug:
+        var: script_find_report_dirs
+        verbosity: "{{ verbosity_level }}"
+
+    - name: Get latest report directory
+      set_fact:
+        script_find_report_dir: "{{ script_find_report_dirs.files |
+                                    sort(attribute='ctime') |
+                                    map(attribute='path') |
+                                    list | last }}"
+      when:
+        - script_find_report_dirs.matched > 0
+
+    - name: Debug script_find_report_dir
+      debug:
+        var: script_find_report_dir
+        verbosity: "{{ verbosity_level }}"
+
+    # TODO: maybe use archive/unarchive
+    # to achieve idempotent retrieval and extraction
+    - name: Fetch report output
+      synchronize:
+        src: "{{ script_find_report_dir }}"
+        dest: "{{ script_fetch_path  }}"
+        mode: pull
+      register: script_fetch_result
+      become: yes
+      when: script_find_report_dir is defined
+
+    - name: Debug script_fetch_result
+      debug:
+        var: script_fetch_result
+        verbosity: "{{ verbosity_level }}"
+
+  when:
+    - script_fetch_output | bool
+
+# TODO: remove temp directory
+# TODO: remove output directory

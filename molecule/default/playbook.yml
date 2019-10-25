@@ -1,0 +1,7 @@
+---
+- name: Converge
+  # strategy: free
+  hosts: all
+
+  roles:
+    - role: ansible-run-script

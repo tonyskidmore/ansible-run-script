@@ -1,0 +1,20 @@
+---
+
+verbosity_level: 0
+script_url: https://github.com
+script_project: trimstray
+script_name: otseca
+script_ref: master
+script_tmp_dir: "/tmp/{{ script_name }}"
+script_output_dir: /tmp/report
+script_requires_install: yes
+script_execute: yes
+script_makes_change: no
+script_path: /usr/local/bin/otseca
+script_install: "./setup.sh install"
+script_fetch_output: yes
+script_fetch_path: ~/otseca_output
+script_params: "--ignore-failed \
+                --format html \
+                --tasks system,network \
+                --output {{ script_output_dir }}"
