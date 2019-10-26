@@ -32,4 +32,4 @@ To destroy the running instances after you have finished testing:
 molecule destroy
 ```
 
-For an excellent article on using Molecule visit [Testing your Ansible roles with Molecule](https://www.jeffgeerling.com/blog/2018/testing-your-ansible-roles-molecule) by (Jeff Geerling)[https://www.jeffgeerling.com/]
+For an excellent article on using Molecule visit [Testing your Ansible roles with Molecule](https://www.jeffgeerling.com/blog/2018/testing-your-ansible-roles-molecule) by [Jeff Geerling](https://www.jeffgeerling.com/)
