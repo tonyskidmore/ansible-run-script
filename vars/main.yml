@@ -2,3 +2,6 @@
 
 script_packages:
   - git
+  - tar
+  - gzip
+  - bzip2

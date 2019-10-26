@@ -3,8 +3,80 @@
 - hosts: all
   gather_facts: yes
 
+  vars_files:
+    - ../../defaults/main.yml
+
   tasks:
 
     - name: Debug distribution details
       debug:
         msg: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+    - name: Check script file exists
+      stat:
+        path: "{{ script_path }}"
+      register: script_verify_path
+
+    - name: Assert that script is in place
+      assert:
+        that:
+          - script_verify_path.stat.exists | bool
+
+- hosts: localhost
+  gather_facts: no
+
+  vars_files:
+    - ../../defaults/main.yml
+
+  tasks:
+
+    - name: Check that local reports have been collected
+      block:
+
+        - name: Get molecule configuration file
+          set_fact:
+            script_molecule_config: "{{ lookup('file', playbook_dir +
+                                        '/molecule.yml') |
+                                        from_yaml }}"
+
+        - name: Get expcted report files fact
+          set_fact:
+            script_report_list: "{{ script_report_list | default([]) +
+                                       [ { 'platform': item.name,
+                                           'path': script_fetch_path +
+                                           '/' + item.name + '/index.html' }
+                                       ] }}"
+          loop: "{{ script_molecule_config.platforms }}"
+
+        - name: Check that expected report files exist locally
+          stat:
+            path: "{{ item.path }}"
+          register: script_stat_report_files
+          loop: "{{ script_report_list }}"
+
+        - name: Set list of found reports
+          set_fact:
+            script_found_reports: "{{ script_found_reports | default([]) +
+                                      [ item.item.path ] }}"
+          loop: "{{ script_stat_report_files.results }}"
+          when: item.stat.exists | bool
+
+        - name: Set list of missing reports
+          set_fact:
+            script_missing_reports: "{{ script_missing_reports | default([]) +
+                                      [ item.item.path ] }}"
+          loop: "{{ script_stat_report_files.results }}"
+          when: not item.stat.exists | bool
+
+        - name: Debug found report files
+          debug:
+            msg: "Found reports: {{ script_found_reports | join(',') }}"
+
+        - name: Fail on missing reports
+          fail:
+            msg: "Missing reports: {{ script_missing_reports | join(',') }}"
+          when:
+            - script_missing_reports is defined
+            - script_missing_reports | length > 0
+
+      when: script_fetch_output | bool

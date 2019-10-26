@@ -14,7 +14,7 @@
 - name: Clone the repo
   git:
     repo: "{{ script_url }}/{{ script_project }}/{{ script_name }}.git"
-    version: "{{ script_ref }}"
+    version: "{{ script_ref | default(omit) }}"
     dest: "{{ script_tmp_dir }}"
 
 - name: Install script
@@ -34,8 +34,15 @@
 - name: Execute script
   command: "{{ script_path }} {{ script_params }}"
   changed_when: script_makes_change | bool
+  register: script_execution
   when: script_execute | bool
   become: yes
+
+- name: Debug script_execution
+  debug:
+    var: script_execution
+    verbosity: "{{ verbosity_level }}"
+  when: extra_debug | bool
 
 - name: Fetch report output
   block:
@@ -66,6 +73,7 @@
       debug:
         var: script_find_report_dirs
         verbosity: "{{ verbosity_level }}"
+      when: extra_debug | bool
 
     - name: Get latest report directory
       set_fact:
@@ -76,29 +84,92 @@
       when:
         - script_find_report_dirs.matched > 0
 
+    - name: Fail if report directory not found
+      fail:
+        msg: "No output report found for {{ inventory_hostname }}!"
+      when: script_find_report_dirs.matched == 0
+
     - name: Debug script_find_report_dir
       debug:
         var: script_find_report_dir
         verbosity: "{{ verbosity_level }}"
 
-    # TODO: maybe use archive/unarchive
-    # to achieve idempotent retrieval and extraction
-    - name: Fetch report output
-      synchronize:
-        src: "{{ script_find_report_dir }}"
-        dest: "{{ script_fetch_path  }}"
-        mode: pull
-      register: script_fetch_result
+    - name: Archive report directory
+      archive:
+        path: "{{ script_find_report_dir }}"
+        dest: "{{ script_output_dir }}/{{ inventory_hostname }}.tgz"
+      register: script_archive_report
       become: yes
-      when: script_find_report_dir is defined
+      when:
+        - script_find_report_dir is defined
 
-    - name: Debug script_fetch_result
+    - name: Debug script_archive_report
       debug:
-        var: script_fetch_result
+        var: script_archive_report
         verbosity: "{{ verbosity_level }}"
+      when: extra_debug | bool
+
+    - name: Fetch report archive
+      fetch:
+        src: "{{ script_output_dir }}/{{ inventory_hostname }}.tgz"
+        dest: "{{ script_fetch_path }}/{{ inventory_hostname }}.tgz"
+        flat: yes
+      register: script_fetch_report
+      become: yes
+      when:
+        - script_archive_report is defined
+        - script_archive_report is changed
+
+    - name: Debug script_fetch_report
+      debug:
+        var: script_fetch_report
+        verbosity: "{{ verbosity_level }}"
+
+    - name: Define extraction path regex
+      set_fact:
+        script_archive_transform: "s/{{ script_find_report_dir |
+                                        basename }}/{{ inventory_hostname }}/"
+
+    - name: Debug script_archive_transform
+      debug:
+        var: script_archive_transform
+        verbosity: "{{ verbosity_level }}"
+
+    - name: Debug script_local_package_check
+      debug:
+        var: script_local_package_check
+        verbosity: "{{ verbosity_level }}"
+
+    - name: Unarchive report file
+      unarchive:
+        src: "{{ script_fetch_path }}/{{ inventory_hostname }}.tgz"
+        dest: "{{ script_fetch_path }}"
+        extra_opts:
+          - --transform
+          - "{{ script_archive_transform }}"
+      delegate_to: localhost
+      when:
+        - script_fetch_path is defined
+
+    - name: Remove source archive
+      file:
+        path: "{{ script_fetch_path }}/{{ inventory_hostname }}.tgz"
+        state: absent
+      delegate_to: localhost
+      when: script_remove_archive | bool
 
   when:
     - script_fetch_output | bool
 
-# TODO: remove temp directory
-# TODO: remove output directory
+- name: Remove temp directory
+  file:
+    path: "{{ script_tmp_dir }}"
+    state: absent
+
+- name: Remove report directory
+  file:
+    path: "{{ script_output_dir }}"
+    state: absent
+  become: yes
+  when:
+    - script_fetch_output | bool

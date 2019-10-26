@@ -1,10 +1,13 @@
 ---
 
-verbosity_level: 0
+verbosity_level: 2
+extra_debug: no
 script_url: https://github.com
 script_project: trimstray
 script_name: otseca
-script_ref: master
+# pinning commit to time of testing for recreatable results
+# replace with "master" to get latest and greatest
+script_ref: 0062751c4bd243acb5d386ed3d16507d97bb416a
 script_tmp_dir: "/tmp/{{ script_name }}"
 script_output_dir: /tmp/report
 script_requires_install: yes
@@ -13,6 +16,7 @@ script_makes_change: no
 script_path: /usr/local/bin/otseca
 script_install: "./setup.sh install"
 script_fetch_output: yes
+script_remove_archive: yes
 script_fetch_path: ~/otseca_output
 script_params: "--ignore-failed \
                 --format html \
